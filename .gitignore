@@ -1,0 +1,51 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Environment variables
+.env
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build and output directories
+dist/
+build/
+coverage/
+out/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Optional npm cache directory
+.npm/
+
+# Ignore lockfiles (optional, depending on preference)
+package-lock.json
+yarn.lock
+
+# Ignore uploaded files (if applicable)
+public/uploads/
+
+# Ignore test coverage reports
+coverage/
+
+# PM2 process files (if using PM2 for managing processes)
+pm2.log
+pm2.pid
