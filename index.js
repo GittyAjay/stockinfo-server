@@ -1,6 +1,6 @@
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
-const swaggerDocs = require('./swaggerConfig');
+const swaggerDocs = require('./swaggerConfig.js');
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
@@ -15,7 +15,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 // Import routes
 const stockRoutes = require('./routes/stockRoutes.js');
 const selectedStock = require('./routes/selectedStock.js');
-const newsRoutes = require('./routes/newsRoutes');
+const newsRoutes = require('./routes/newsRoutes.js');
 const extractRoutes = require('./routes/extractRoutes.js');
 const userRoutes = require('./routes/userRoutes.js');
 // const openAiRoutes = require('./routes/openAiRoutes.js');
