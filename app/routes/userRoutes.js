@@ -8,6 +8,12 @@ const router = express.Router();
 
 const JWT_SECRET = 'your-secret-key';
 
+/**
+ * @swagger
+ * /auth/create-user:
+ *   post:
+ *     summary: Create a new user
+ */
 router.post('/create-user', async (req, res) => {
   try {
     const { email, name, mobile, password, device_details } = req.body;

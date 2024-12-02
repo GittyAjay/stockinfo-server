@@ -1,0 +1,67 @@
+model User {
+  id             Int              @id @default(autoincrement())
+  email          String           @unique
+  name           String?
+  mobile         String?
+  password       String
+  device_details Json
+  updated_at     DateTime
+  created_at     DateTime
+  selectedStocks StockSelection[]
+}
+
+model Stock {
+  id               Int                @id @default(autoincrement())
+  symbol           String
+  name             String             @unique // Add the @unique directive here
+  sector           String?
+  industry         String?
+  createdAt        DateTime?          @default(now())
+  updatedAt        DateTime?          @default(now()) @updatedAt
+  selectedUsers    StockSelection[]
+  news             News[]
+  ExtractedContent ExtractedContent[]
+}
+
+model StockSelection {
+  userId   Int
+  stockId  Int
+  selected Boolean @default(false)
+  user     User    @relation(fields: [userId], references: [id])
+  stock    Stock   @relation(fields: [stockId], references: [id])
+
+  @@id([userId, stockId])
+}
+
+model News {
+  id        Int      @id @default(autoincrement())
+  title     String   @unique
+  url       String   @unique
+  content   String
+  source    String
+  published DateTime
+  image     String?
+  stockId   Int
+  stock     Stock    @relation(fields: [stockId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model ExtractedContent {
+  id        Int      @id @default(autoincrement())
+  url       String   @unique
+  content   String
+  stockId   Int
+  stock     Stock    @relation(fields: [stockId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

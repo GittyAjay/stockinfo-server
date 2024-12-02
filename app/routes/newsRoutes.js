@@ -25,6 +25,12 @@ const downloadImage = async (url, filename) => {
   });
 };
 
+/**
+ * @swagger
+ * /news:
+ *   get:
+ *     summary: Get news articles for a given stock name
+ */
 router.get('/', async (req, res) => {
   const query = req.query.stock_name;
 

@@ -11,6 +11,12 @@ const prisma = new PrismaClient();
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /extract:
+ *   post:
+ *     summary: Extract news content from a given URL
+ */
 router.post('/', async (req, res) => {
   const { url, stock_name } = req.body;
 

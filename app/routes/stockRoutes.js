@@ -9,13 +9,13 @@ const router = express.Router();
 
 /**
  * @swagger
- * /:
+ * /all_stock:
  *   get:
- *     summary: Fetch stock data from an external website and save it to the database
- *     description: Scrapes stock data from Upstox's listed company page, processes it, and stores it in the database using Prisma. Responds with the scraped stock data.
+ *     summary: Retrieve a list of all stocks
+ *     tags: [Stocks]
  *     responses:
  *       200:
- *         description: Successfully fetched and saved stock data
+ *         description: A list of stocks
  *         content:
  *           application/json:
  *             schema:
@@ -25,23 +25,12 @@ const router = express.Router();
  *                 properties:
  *                   name:
  *                     type: string
- *                     example: "Reliance Industries"
  *                   symbol:
  *                     type: string
- *                     example: "reliance-industries"
  *                   id:
  *                     type: number
- *                     example: 1234567890
  *       500:
- *         description: Failed to fetch stock data
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Failed to fetch stock data"
+ *         description: Server error
  */
 
 router.get('/', async (req, res) => {
