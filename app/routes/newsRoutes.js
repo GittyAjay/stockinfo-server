@@ -1,14 +1,13 @@
-const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
-const path = require('path');
-const { PrismaClient } = require('@prisma/client');
+import express from 'express';
+import axios from 'axios';
+import { load } from 'cheerio';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const router = express.Router();
-
 // Utility to download and save an image
 const downloadImage = async (url, filename) => {
   const response = await axios({
@@ -25,12 +24,6 @@ const downloadImage = async (url, filename) => {
   });
 };
 
-/**
- * @swagger
- * /news:
- *   get:
- *     summary: Get news articles for a given stock name
- */
 router.get('/', async (req, res) => {
   const query = req.query.stock_name;
 
@@ -54,7 +47,7 @@ router.get('/', async (req, res) => {
     const url = `https://www.bing.com/news/search?q=${queryEncoded}&qs=n&form=QBNT&sp=-1&lq=0&pq=${queryEncoded}&sc=1-17&sk=&cvid=${cvid}&ghsh=0&ghacc=0&ghpl=`;
 
     const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
+    const $ = load(response.data);
 
     const articles = [];
     $('a.title').each((_, element) => {
@@ -128,4 +121,4 @@ router.get('/', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

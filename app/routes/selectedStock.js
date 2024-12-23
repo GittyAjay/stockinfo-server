@@ -1,5 +1,5 @@
-const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
 /**
  * @swagger
  * /stock/select-stock:
@@ -155,4 +155,4 @@ router.post('/all_stock', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

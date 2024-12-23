@@ -1,8 +1,8 @@
-const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const { PrismaClient } = require('@prisma/client');
-const OpenAI = require('openai');
+import express from 'express';
+import axios from 'axios';
+import { load } from 'cheerio';
+import { PrismaClient } from '@prisma/client';
+import OpenAI from 'openai';
 const openai = new OpenAI({
   apiKey:
     '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', // Replace with your actual OpenAI API key
@@ -11,12 +11,12 @@ const prisma = new PrismaClient();
 
 const router = express.Router();
 
-/**
- * @swagger
- * /extract:
- *   post:
- *     summary: Extract news content from a given URL
- */
+// /**
+//  * @swagger
+//  * /extract:
+//  *   post:
+//  *     summary: Extract news content from a given URL
+//  */
 router.post('/', async (req, res) => {
   const { url, stock_name } = req.body;
 
@@ -79,4 +79,4 @@ router.post('/', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

@@ -1,4 +1,4 @@
-const swaggerJsDoc = require('swagger-jsdoc');
+import swaggerJsDoc from 'swagger-jsdoc';
 
 const swaggerOptions = {
   definition: {
@@ -18,7 +18,9 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: process.env.API_URL || 'http://localhost:5000',
+        url:
+          process.env.API_URL ||
+          'https://abbb-2409-4089-ceb9-7e1-176-57e5-1fa9-3524.ngrok-free.app',
         description: 'Development server',
       },
     ],
@@ -35,5 +37,4 @@ const swaggerOptions = {
   apis: ['./app/routes/*.js'],
 };
 
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
-module.exports = swaggerDocs;
+export const swaggerDocs = swaggerJsDoc(swaggerOptions);
