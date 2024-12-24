@@ -2,27 +2,61 @@ import express from 'express';
 import axios from 'axios';
 import { load } from 'cheerio';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import path from 'path';
 import { PrismaClient } from '@prisma/client';
-
 const prisma = new PrismaClient();
 const router = express.Router();
 // Utility to download and save an image
-const downloadImage = async (url, filename) => {
-  const response = await axios({
-    url,
-    method: 'GET',
-    responseType: 'stream',
-  });
+async function getImageFromLink(url) {
+  try {
+    // Fetch the HTML content of the webpage
+    const response = await axios.get(url);
 
-  const imagePath = path.join(__dirname, 'images', filename);
-  return new Promise((resolve, reject) => {
-    const stream = response.data.pipe(fs.createWriteStream(imagePath));
-    stream.on('finish', () => resolve(imagePath));
-    stream.on('error', reject);
-  });
-};
+    // Load the HTML into cheerio for parsing
+    const $ = load(response.data);
+
+    // Try to get the Open Graph image
+    const ogImage = $("meta[property='og:image']").attr('content');
+
+    // If no Open Graph image, try the Twitter image
+    const twitterImage = $("meta[name='twitter:image']").attr('content');
+
+    // If neither of the above, try the standard image tags (e.g., <img> with a large enough src)
+    const fallbackImage = $('img').first().attr('src'); // You can refine this to pick the most suitable image
+
+    // Return the first valid image found (OG > Twitter > Fallback)
+    return ogImage || twitterImage || fallbackImage || 'No image found';
+  } catch (error) {
+    console.error('Error fetching image:', error);
+    return 'Error fetching image';
+  }
+}
+// Function to scrape summary from Google Search
+async function scrapeSummary(url) {
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+      },
+    });
+
+    const $ = load(response.data);
+    let summary = '';
+
+    $('span.hgKElc').each((_, element) => {
+      const text = $(element).text();
+      if (text) {
+        summary = text;
+        return false; // Exit the loop after finding the first match
+      }
+    });
+
+    return summary || 'Summary not found';
+  } catch (error) {
+    console.error('Error scraping summary:', error.message);
+    return 'Failed to fetch summary';
+  }
+}
 
 router.get('/', async (req, res) => {
   const query = req.query.stock_name;
@@ -34,7 +68,6 @@ router.get('/', async (req, res) => {
   const cvid = uuidv4().toUpperCase().replace(/-/g, '');
 
   try {
-    // Check if the stock exists in the database
     const stock = await prisma.stock.findUnique({
       where: { name: query },
     });
@@ -49,43 +82,32 @@ router.get('/', async (req, res) => {
     const response = await axios.get(url);
     const $ = load(response.data);
 
-    const articles = [];
-    $('a.title').each((_, element) => {
-      const title = $(element).text();
-      const link = $(element).attr('href');
-      const imageUrl = $(element).find('div.citm_img img').attr('src');
+    const articlePromises = $('a.title')
+      .map(async (_, element) => {
+        const title = $(element).text();
+        const link = $(element).attr('href');
+        const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(
+          title
+        )}+summary`;
+        const summary = await scrapeSummary(googleSearchUrl);
+        const imageUrl = await getImageFromLink(link);
+        console.log('===imageUrl', imageUrl);
 
-      console.log('imageUrl', imageUrl);
+        return {
+          title,
+          url: link,
+          imageUrl,
+          content: summary,
+          source: 'Bing News',
+          published: new Date(), // Adjust if scraping the publish date
+          stockId: stock.id, // Associate with the stockId found earlier
+        };
+      })
+      .get();
 
-      // Prepare article data
-      const article = {
-        title,
-        url: link,
-        imageUrl,
-        content: '', // Add logic to scrape detailed content if needed
-        source: 'Bing News',
-        published: new Date(), // Adjust if scraping the publish date
-        stockId: stock.id, // Associate with the stockId found earlier
-      };
+    const articles = await Promise.all(articlePromises);
 
-      articles.push(article);
-    });
-
-    // Save or update news articles in the database
     for (const article of articles) {
-      let imagePath = null;
-      if (article.imageUrl) {
-        try {
-          const imageFilename = `${uuidv4()}.jpg`;
-          imagePath = await downloadImage(article.imageUrl, imageFilename);
-        } catch (error) {
-          console.error(
-            `Failed to download image for ${article.title}:`,
-            error
-          );
-        }
-      }
-
       await prisma.news.upsert({
         where: { url: article.url, title: article.title },
         update: {
@@ -93,7 +115,7 @@ router.get('/', async (req, res) => {
           content: article.content,
           source: article.source,
           published: article.published,
-          image: imagePath,
+          image: article.imageUrl,
         },
         create: {
           title: article.title,
@@ -102,12 +124,11 @@ router.get('/', async (req, res) => {
           source: article.source,
           published: article.published,
           stockId: article.stockId,
-          image: imagePath,
+          image: article.imageUrl,
         },
       });
     }
 
-    // Respond with the articles
     if (articles.length > 0) {
       res.json(articles);
     } else {
@@ -116,7 +137,7 @@ router.get('/', async (req, res) => {
         .json({ error: 'No news found for the given stock name.' });
     }
   } catch (error) {
-    // console.error('Error fetching news:', error);
+    console.error('Error fetching news:', error);
     res.status(500).json({ error: `Failed to fetch news: ${query}` });
   }
 });

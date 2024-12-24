@@ -20,38 +20,59 @@ const router = express.Router();
 router.post('/', async (req, res) => {
   const { url, stock_name } = req.body;
 
+  console.log('Received request with URL:', url, 'and stock_name:', stock_name); // Debug log for incoming request
+
   if (!url || !stock_name) {
+    console.log('Missing URL or stock_name'); // Debug log for missing fields
     return res.status(400).json({ error: 'URL and stock_name are required.' });
   }
 
   try {
+    console.log('Fetching URL:', url); // Debug log for URL fetching
     const response = await axios.get(url, { timeout: 10000 });
-    const $ = cheerio.load(response.data);
+    const $ = load(response.data);
 
     const pageText = $('body').text();
-    const cleanedText = pageText.trim();
+    const cleanedText = pageText
+      .trim()
+      .replace(/[^a-zA-Z0-9]/g, '') // Removes non-alphanumeric characters including spaces
+      .slice(0, 1000); // Limits the string to 500 characters
+
+    console.log('Fetched content:', cleanedText.slice(0, 200)); // Log a snippet of the fetched content
 
     // Find the stock by symbol
+    console.log('Searching for stock with name:', stock_name); // Debug log for stock search
     const stock = await prisma.stock.findUnique({
       where: { name: stock_name },
     });
 
     if (!stock) {
+      console.log('Stock not found:', stock_name); // Debug log if stock is not found
       return res.status(404).json({ error: 'Stock not found.' });
     }
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
-        {
-          role: 'user',
-          content: `Summarize the following news content into a short, concise summary of 150 words: \n\n${cleanedText}`,
-        },
-      ],
-    });
 
-    const summary = completion.choices[0]?.message?.content?.trim();
+    console.log('Stock found:', stock.name); // Debug log for successful stock retrieval
+
+    // Call OpenAI for summarization
+    console.log('Requesting summary from OpenAI', cleanedText); // Debug log for OpenAI call
+    let completion;
+    if (cleanedText)
+      completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          {
+            role: 'user',
+            content: `Summarize the following news content into a short, concise summary of 150 words: \n\n${cleanedText}`,
+          },
+        ],
+      });
+
+    const summary = completion?.choices[0]?.message?.content?.trim() || '';
+    console.log('Received summary:', summary); // Log the summary received from OpenAI
+
     // Create or update the news content for the specific stock
+    console.log('Upserting news content for stock:', stock.name); // Debug log for upsert
     const news = await prisma.news.upsert({
       where: { url },
       update: { content: summary, stockId: stock.id },
@@ -66,6 +87,7 @@ router.post('/', async (req, res) => {
     });
 
     // Respond with the news content
+    console.log('News content successfully created/updated'); // Debug log for successful response
     res.json({
       newsId: news.id,
       title: news.title,
@@ -74,7 +96,7 @@ router.post('/', async (req, res) => {
       stock: stock.name,
     });
   } catch (error) {
-    // console.error('Error fetching content:', error);
+    console.error('Error fetching content:', error); // Log the error for debugging
     res.status(500).json({ error: `Failed to fetch URL: ${url}` });
   }
 });

@@ -1,52 +1,52 @@
 import express from 'express';
-import cors from 'cors'; // Import the cors package
+import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocs } from './app/swaggerConfig.js';
 import cron from 'node-cron';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 
-const prisma = new PrismaClient();
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Middleware to parse JSON bodies
-app.use(express.json());
-
-// Enable CORS for all origins
-// CORS setup
-const corsOptions = {
-  origin: '*', // Allow all origins
-  methods: 'GET, POST, PUT, DELETE', // Allow these methods
-  allowedHeaders: 'Content-Type, Authorization', // Allow these headers
-};
-
-app.use(cors(corsOptions));
-
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
-// Import routes
+// Import routes before using them
 import stockRoutes from './app/routes/stockRoutes.js';
 import selectedStock from './app/routes/selectedStock.js';
 import newsRoutes from './app/routes/newsRoutes.js';
 import extractRoutes from './app/routes/extractRoutes.js';
 import userRoutes from './app/routes/userRoutes.js';
 import stockList from './app/routes/stockList.js';
-// Use routes
-app.use('/stock-list', stockList);
 
+const prisma = new PrismaClient();
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(express.json());
+
+// CORS setup
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Array format is preferred
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true, // Add this if you need to handle cookies/authentication
+};
+
+app.use(cors(corsOptions));
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+// Routes
+app.use('/stock-list', stockList);
 app.use('/all_stock', stockRoutes);
 app.use('/stock', selectedStock);
 app.use('/news', newsRoutes);
 app.use('/extract', extractRoutes);
 app.use('/auth', userRoutes);
 
-// Define the cron job
+// Cron job
 cron.schedule('* * * * *', async () => {
-  console.log('Running cron job for StockSelection');
-
   try {
+    console.log('Running cron job for StockSelection');
+
     const selectedStocks = await prisma.stockSelection.findMany({
       where: { selected: true },
       include: {
@@ -54,32 +54,43 @@ cron.schedule('* * * * *', async () => {
       },
     });
 
-    const selectedStockNames = selectedStocks.map((stock) => stock.stock?.name);
+    const selectedStockNames = selectedStocks
+      .filter((stock) => stock.stock?.name) // Add null check
+      .map((stock) => stock.stock.name);
+
     console.log('Selected Stock Names:', selectedStockNames);
 
-    const extractRequests = selectedStockNames.map(async (name) => {
-      try {
-        const extractResponse = await axios.get(
-          `${
-            process.env.NGROK_URL || `http://localhost:${PORT}`
-          }/news?stock_name=${name}`
-        );
-        console.log(
-          `Data extracted successfully for ${name}:`,
-          extractResponse.data
-        );
-      } catch (error) {
-        console.error(`Error extracting data for ${name}:`, error.message);
-      }
-    });
+    // Use Promise.allSettled instead of Promise.all to handle failures better
+    const extractResults = await Promise.allSettled(
+      selectedStockNames.map(async (name) => {
+        try {
+          const baseUrl = process.env.NGROK_URL || `http://localhost:${PORT}`;
+          const response = await axios.get(
+            `${baseUrl}/news?stock_name=${encodeURIComponent(name)}`
+          );
+          // console.log(
+          //   `Data extracted successfully for ${name}:`,
+          //   response.data
+          // );
+          return response.data;
+        } catch (error) {
+          console.error(`Error extracting data for ${name}:`, error.message);
+          throw error;
+        }
+      })
+    );
 
-    await Promise.all(extractRequests);
+    const selectedStockIds = selectedStocks
+      .filter((stock) => stock.stockId) // Add null check
+      .map((stock) => stock.stockId);
 
-    const selectedStockIds = selectedStocks.map((stock) => stock.stockId);
     console.log('Selected Stock IDs:', selectedStockIds);
 
     const selectedNews = await prisma.news.findMany({
-      where: { stockId: { in: selectedStockIds }, content: '' },
+      where: {
+        stockId: { in: selectedStockIds },
+        content: '',
+      },
       include: {
         stock: true,
       },
@@ -87,31 +98,36 @@ cron.schedule('* * * * *', async () => {
 
     console.log('Selected News:', selectedNews);
 
-    const newsExtractionRequests = selectedNews.map(async (news) => {
-      try {
-        const extractResponse = await axios.post(
-          `${process.env.NGROK_URL || `http://localhost:${PORT}`}/extract`,
-          { url: news.url, stock_name: news.stock.name }
-        );
-        console.log(
-          `Data extracted successfully for ${news.stock.name}:`,
-          extractResponse.data
-        );
-      } catch (error) {
-        console.error(
-          `Error extracting news for ${news.stock.name}:`,
-          error.message
-        );
-      }
-    });
-
-    await Promise.all(newsExtractionRequests);
+    // Uncomment and modify news extraction if needed
+    // const newsExtractionResults = await Promise.allSettled(
+    //   selectedNews.map(async (news) => {
+    //     // Add your news extraction logic here
+    //   })
+    // );
   } catch (error) {
     console.error('Error occurred during the cron job:', error.message);
+  } finally {
+    // Consider adding cleanup code here if needed
   }
 });
 
-const host = '0.0.0.0'; // Listen on all network interfaces for ngrok
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something broke!' });
+});
+
+// Start server
+const host = '0.0.0.0';
 app.listen(PORT, host, () => {
-  console.log(`Server is running on http://localhost:5000`);
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+// Handle process termination
+process.on('SIGTERM', async () => {
+  console.log(
+    'SIGTERM received. Closing HTTP server and database connections...'
+  );
+  await prisma.$disconnect();
+  process.exit(0);
 });
