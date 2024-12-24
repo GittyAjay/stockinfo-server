@@ -5,9 +5,19 @@ model User {
   mobile         String?
   password       String
   device_details Json
+  otp            String? // OTP sent to the user for email verification
+  otpExpiry      DateTime? // Expiry time for OTP
   updated_at     DateTime
   created_at     DateTime
   selectedStocks StockSelection[]
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  otp       String // OTP sent to the user
+  expiresAt DateTime // Expiry time for OTP
+  createdAt DateTime @default(now()) // Record creation time
 }
 
 model Stock {

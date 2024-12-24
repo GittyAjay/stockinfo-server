@@ -5,7 +5,7 @@ import { swaggerDocs } from './app/swaggerConfig.js';
 import cron from 'node-cron';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
-
+// import nodemailer from 'nodemailer';
 // Import routes before using them
 import stockRoutes from './app/routes/stockRoutes.js';
 import selectedStock from './app/routes/selectedStock.js';
@@ -21,6 +21,15 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(express.json());
 
+// Create the transporter for Gmail
+// const transporter = nodemailer.createTransport({
+//   service: 'gmail',
+//   auth: {
+//     user: 'moneystreakservice@gmail.com', // Your email
+//     pass: 'ocnb tdqg rrvv vgvq', // Your email password or App password
+//   },
+// });
+
 // CORS setup
 const corsOptions = {
   origin: '*',
@@ -30,6 +39,30 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Define the endpoint for sending email
+// app.post('/send-email', (req, res) => {
+//   const { to, subject, text } = req.body;
+
+//   // Mail options
+//   const mailOptions = {
+//     from: 'moneystreakservice@gmail.com', // Your email
+//     to: to, // Receiver's email
+//     subject: subject, // Subject of the email
+//     text: text, // Content of the email
+//   };
+
+//   // Send the email
+//   transporter.sendMail(mailOptions, (error, info) => {
+//     if (error) {
+//       console.log(error);
+//       return res.status(500).json({ message: 'Error sending email', error });
+//     } else {
+//       console.log('Email sent: ' + info.response);
+//       return res.status(200).json({ message: 'Email sent successfully', info });
+//     }
+//   });
+// });
 
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
