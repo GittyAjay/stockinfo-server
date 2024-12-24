@@ -5,6 +5,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const router = express.Router();
+const fakeImageUrls = [
+  'https://media.newyorker.com/photos/590970db019dfc3494ea21c1/master/w_1920,c_limit/Cassidy-Financial-Times-and-the-Future-of-Journalism.jpg',
+  'https://www.orientfutures.com.sg/resources/ck/images/blog/Latest%20Finance%20News.png',
+  'https://c7.alamy.com/comp/CN6EW7/financial-news-newspaper-with-white-background-CN6EW7.jpg',
+];
 // Utility to download and save an image
 async function getImageFromLink(url) {
   try {
@@ -21,13 +26,14 @@ async function getImageFromLink(url) {
     const twitterImage = $("meta[name='twitter:image']").attr('content');
 
     // If neither of the above, try the standard image tags (e.g., <img> with a large enough src)
-    const fallbackImage = $('img').first().attr('src'); // You can refine this to pick the most suitable image
+    const fallbackImage =
+      fakeImageUrls[Math.floor(Math.random() * fakeImageUrls.length)];
 
     // Return the first valid image found (OG > Twitter > Fallback)
-    return ogImage || twitterImage || fallbackImage || 'No image found';
+    return ogImage || twitterImage || fallbackImage;
   } catch (error) {
     console.error('Error fetching image:', error);
-    return 'Error fetching image';
+    return fallbackImage;
   }
 }
 // Function to scrape summary from Google Search
