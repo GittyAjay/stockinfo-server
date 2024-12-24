@@ -33,7 +33,7 @@ async function getImageFromLink(url) {
     return ogImage || twitterImage || fallbackImage;
   } catch (error) {
     console.error('Error fetching image:', error);
-    return fallbackImage;
+    return fakeImageUrls[Math.floor(Math.random() * fakeImageUrls.length)];
   }
 }
 // Function to scrape summary from Google Search
