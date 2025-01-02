@@ -11,7 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^6.1.0",
     "axios": "^1.7.8",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.0.0",
@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "prisma": "^5.22.0",
+    "prisma": "^6.1.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

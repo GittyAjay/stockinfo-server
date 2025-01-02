@@ -68,7 +68,7 @@ app.use(cors(corsOptions));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Routes
-app.use('/stock-list', stockList);
+app.use('/stocks', stockList);
 app.use('/all_stock', stockRoutes);
 app.use('/stock', selectedStock);
 app.use('/news', newsRoutes);

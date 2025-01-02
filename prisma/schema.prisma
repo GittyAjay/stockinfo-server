@@ -3,7 +3,7 @@ model User {
   email          String           @unique
   name           String?
   mobile         String?
-  password       String
+  password       String?
   device_details Json
   otp            String? // OTP sent to the user for email verification
   otpExpiry      DateTime? // Expiry time for OTP
@@ -14,7 +14,7 @@ model User {
 
 model Otp {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
+  email     String
   otp       String // OTP sent to the user
   expiresAt DateTime // Expiry time for OTP
   createdAt DateTime @default(now()) // Record creation time

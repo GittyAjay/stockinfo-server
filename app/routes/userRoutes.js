@@ -25,7 +25,6 @@ const JWT_SECRET = 'your-secret-key';
  *             type: object
  *             required:
  *               - email
- *               - password
  *               - device_details
  *             properties:
  *               email:
@@ -34,8 +33,6 @@ const JWT_SECRET = 'your-secret-key';
  *               name:
  *                 type: string
  *               mobile:
- *                 type: string
- *               password:
  *                 type: string
  *               device_details:
  *                 type: string
@@ -62,7 +59,6 @@ const JWT_SECRET = 'your-secret-key';
  *       500:
  *         description: Server error
  */
-
 // Setup Nodemailer transport
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -117,12 +113,12 @@ const sendConfirmationEmail = async (email, name) => {
 // Route for creating a new user
 router.post('/create-user', async (req, res) => {
   try {
-    const { email, name, mobile, password, device_details } = req.body;
+    const { email, name, mobile, device_details } = req.body;
 
-    if (!email || !password || !device_details) {
+    if (!email || !device_details) {
       return res
         .status(400)
-        .json({ error: 'Email, password, and device details are required.' });
+        .json({ error: 'Email and device details are required.' });
     }
 
     // Check if the user already exists
@@ -136,26 +132,21 @@ router.post('/create-user', async (req, res) => {
         .json({ error: 'User with this email already exists.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     const newUser = await prisma.user.create({
       data: {
         email,
         name,
         mobile,
-        password: hashedPassword,
         device_details,
         created_at: new Date(),
         updated_at: new Date(),
       },
     });
 
-    const { password: _, ...userWithoutPassword } = newUser;
-
     // Send confirmation email after creating the user
     await sendConfirmationEmail(email, name);
 
-    res.status(201).json(userWithoutPassword);
+    res.status(201).json(newUser);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error creating user.' });
@@ -186,8 +177,6 @@ const sendOTPEmail = async (email, otp) => {
 // Route to send OTP to email on login
 router.post('/login', async (req, res) => {
   try {
-    console.log('Request body:', req.body);
-
     const { email } = req.body;
 
     if (!email) {
@@ -205,35 +194,30 @@ router.post('/login', async (req, res) => {
         .json({ error: 'User with this email does not exist.' });
     }
 
+    // Delete expired OTPs before generating a new one
+    await prisma.otp.deleteMany({
+      where: {
+        email: user.email,
+        expiresAt: { lt: new Date() },
+      },
+    });
+
     // Generate OTP
     const otp = generateOTP();
 
-    try {
-      // Save OTP in the database with expiration time (1 hour)
-      const otpRecord = await prisma.otp.create({
-        data: {
-          email: user.email,
-          otp: otp.toString(),
-          expiresAt: new Date(Date.now() + 3600000), // OTP expires in 1 hour
-        },
-      });
+    // Save OTP in the database with expiration time (1 hour)
+    const otpRecord = await prisma.otp.create({
+      data: {
+        email: user.email,
+        otp: otp.toString(),
+        expiresAt: new Date(Date.now() + 3600000), // OTP expires in 1 hour
+      },
+    });
 
-      // Only send email if OTP was successfully saved
-      if (otpRecord) {
-        await sendOTPEmail(email, otp);
-        res.status(200).json({ message: 'OTP sent to email' });
-      }
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      // Check if the error is related to missing table
-      if (dbError.code === 'P2021') {
-        res.status(500).json({
-          error: 'Database schema issue - OTP table may not exist',
-          details: 'Please ensure you have run your Prisma migrations',
-        });
-      } else {
-        res.status(500).json({ error: 'Error saving OTP' });
-      }
+    // Only send email if OTP was successfully saved
+    if (otpRecord) {
+      await sendOTPEmail(email, otp);
+      res.status(200).json({ message: 'OTP sent to email' });
     }
   } catch (error) {
     console.error('Login error:', error);
@@ -352,6 +336,7 @@ router.post('/verify-otp', async (req, res) => {
  *       500:
  *         description: Server error
  */
+
 /**
  * @swagger
  * components:
@@ -363,47 +348,71 @@ router.post('/verify-otp', async (req, res) => {
  *
  * /auth/user-news:
  *   get:
- *     summary: Get news for user's selected stocks
+ *     summary: Get paginated news for user's selected stocks
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of items per page
  *     responses:
  *       200:
- *         description: Successfully retrieved news
+ *         description: Successfully retrieved paginated news
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   title:
- *                     type: string
- *                   url:
- *                     type: string
- *                   content:
- *                     type: string
- *                   source:
- *                     type: string
- *                   published:
- *                     type: string
- *                     format: date-time
- *                   image:
- *                     type: string
- *                   stockId:
- *                     type: integer
- *                   createdAt:
- *                     type: string
- *                     format: date-time
- *                   updatedAt:
- *                     type: string
- *                     format: date-time
- *                   stockName:
- *                     type: string
- *                   stockSymbol:
- *                     type: string
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       url:
+ *                         type: string
+ *                       content:
+ *                         type: string
+ *                       source:
+ *                         type: string
+ *                       published:
+ *                         type: string
+ *                         format: date-time
+ *                       image:
+ *                         type: string
+ *                       stockId:
+ *                         type: integer
+ *                       stockName:
+ *                         type: string
+ *                       stockSymbol:
+ *                         type: string
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     pageSize:
+ *                       type: integer
+ *                     currentPage:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
  *       401:
  *         description: Unauthorized - No token provided or invalid token
  *       500:
@@ -420,6 +429,14 @@ router.get('/user-news', async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
     const userId = decoded.userId;
+
+    // Extract pagination parameters from query
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.pageSize) || 10)
+    );
+    const skip = (page - 1) * pageSize;
 
     // Get user's selected stocks with related news
     const userStocks = await prisma.stockSelection.findMany({
@@ -440,7 +457,8 @@ router.get('/user-news', async (req, res) => {
       },
     });
 
-    const newsData = userStocks.flatMap((selection) =>
+    // Collect and flatten all news
+    const allNews = userStocks.flatMap((selection) =>
       selection.stock.news.map((news) => ({
         ...news,
         stockName: selection.stock.name,
@@ -448,7 +466,42 @@ router.get('/user-news', async (req, res) => {
       }))
     );
 
-    res.json(newsData);
+    // Sort all news by published date (newest first)
+    const sortedNews = allNews.sort(
+      (a, b) =>
+        new Date(b.published).getTime() - new Date(a.published).getTime()
+    );
+
+    // Calculate pagination
+    const total = sortedNews.length;
+    const totalPages = Math.ceil(total / pageSize);
+
+    // Validate page number
+    if (page > totalPages && total > 0) {
+      return res.status(400).json({
+        error: 'Page number exceeds total pages',
+        pagination: {
+          total,
+          pageSize,
+          currentPage: page,
+          totalPages,
+        },
+      });
+    }
+
+    // Paginate the news
+    const paginatedNews = sortedNews.slice(skip, skip + pageSize);
+
+    // Return paginated response
+    res.json({
+      data: paginatedNews,
+      pagination: {
+        total,
+        pageSize,
+        currentPage: page,
+        totalPages,
+      },
+    });
   } catch (error) {
     console.error(error);
     if (error.name === 'JsonWebTokenError') {
